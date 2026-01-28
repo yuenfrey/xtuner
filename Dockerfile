@@ -5,11 +5,11 @@ ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:25.03-py3
 ## build args
 FROM ${BASE_IMAGE} AS setup_env
 
-ARG TORCH_VERSION
-ARG PPA_SOURCE
+ARG TORCH_VERSION=2.9.0
+# ARG PPA_SOURCE
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
-    sed -i "s@http://.*.ubuntu.com@${PPA_SOURCE}@g" /etc/apt/sources.list.d/ubuntu.sources && \
+    # sed -i "s@http://.*.ubuntu.com@${PPA_SOURCE}@g" /etc/apt/sources.list.d/ubuntu.sources && \
     apt update && \
     apt install --no-install-recommends ca-certificates -y && \
     apt install --no-install-recommends bc wget -y && \
@@ -25,10 +25,10 @@ RUN git config --system --add safe.directory "*"
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     if [ -n "${TORCH_VERSION}" ]; then \
-        pip install torchvision torch==${TORCH_VERSION} \
-        --index-url https://download.pytorch.org/whl/cu128 \
-        --extra-index-url https://download.pytorch.org/whl/cu126 \
-        --no-cache-dir; \
+    pip install torchvision torch==${TORCH_VERSION} \
+    --index-url https://download.pytorch.org/whl/cu128 \
+    --extra-index-url https://download.pytorch.org/whl/cu126 \
+    --no-cache-dir; \
     fi
 
 # set reasonable default for CUDA architectures when building ngc image
@@ -54,7 +54,7 @@ FROM setup_env AS flash_attn
 ARG CODESPACE
 ARG FLASH_ATTN_DIR
 ARG FLASH_ATTN3_DIR
-ARG FLASH_ATTN_URL
+ARG FLASH_ATTN_URL=https://github.com/Dao-AILab/flash-attention@060c9188beec3a8b62b33a3bfa6d5d2d44975fab
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     git clone $(echo ${FLASH_ATTN_URL} | cut -d '@' -f 1) && \
@@ -72,7 +72,7 @@ FROM setup_env AS adaptive_gemm
 
 ARG CODESPACE
 ARG ADAPTIVE_GEMM_DIR
-ARG ADAPTIVE_GEMM_URL
+ARG ADAPTIVE_GEMM_URL=https://github.com/InternLM/AdaptiveGEMM@374e68fb9ea7168c038cc92d89b438de2b3beb9a
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     git clone $(echo ${ADAPTIVE_GEMM_URL} | cut -d '@' -f 1) && \
@@ -89,7 +89,7 @@ FROM setup_env AS grouped_gemm
 
 ARG CODESPACE
 ARG GROUPED_GEMM_DIR
-ARG GROUPED_GEMM_URL
+ARG GROUPED_GEMM_URL=https://github.com/InternLM/GroupedGEMM@aa5ffb21cb626d6cd61d99fc42958127b0b99be7
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     git clone $(echo ${GROUPED_GEMM_URL} | cut -d '@' -f 1) && \
@@ -106,7 +106,7 @@ FROM setup_env AS deep_ep
 
 ARG CODESPACE
 ARG DEEP_EP_DIR
-ARG DEEP_EP_URL
+ARG DEEP_EP_URL=https://github.com/deepseek-ai/DeepEP@9af0e0d0e74f3577af1979c9b9e1ac2cad0104ee
 # build sm90 and sm100 for deep_ep for now
 ARG TORCH_CUDA_ARCH_LIST="9.0 10.0"
 
@@ -143,7 +143,7 @@ FROM setup_env AS deep_gemm
 
 ARG CODESPACE
 ARG DEEP_GEMM_DIR
-ARG DEEP_GEMM_URL
+ARG DEEP_GEMM_URL=https://github.com/deepseek-ai/DeepGEMM@c9f8b34dcdacc20aa746b786f983492c51072870
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     git clone $(echo ${DEEP_GEMM_URL} | cut -d '@' -f 1) && \
@@ -184,34 +184,34 @@ RUN unzip ${DEEP_EP_DIR}/*.whl -d ${PYTHON_SITE_PACKAGE_PATH}
 RUN unzip ${DEEP_GEMM_DIR}/*.whl -d ${PYTHON_SITE_PACKAGE_PATH}
 
 # install sglang and its runtime requirements
-ARG SGLANG_VERSION
+ARG SGLANG_VERSION=0.5.3
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
-   pip install sglang==${SGLANG_VERSION} sgl-kernel==0.3.14.post1 pybase64 orjson uvloop setproctitle msgspec \
-   compressed_tensors python-multipart torch_memory_saver \
-   grpcio-tools==1.75.1 hf_transfer interegular llguidance==0.7.11 \
-   xgrammar==0.1.24 blobfile==3.0.0 flashinfer_python==0.4.0 --no-cache-dir --no-deps
+    pip install sglang==${SGLANG_VERSION} sgl-kernel==0.3.14.post1 pybase64 orjson uvloop setproctitle msgspec \
+    compressed_tensors python-multipart torch_memory_saver \
+    grpcio-tools==1.75.1 hf_transfer interegular llguidance==0.7.11 \
+    xgrammar==0.1.24 blobfile==3.0.0 flashinfer_python==0.4.0 --no-cache-dir --no-deps
 
 # install lmdeploy and its missing runtime requirements
-ARG LMDEPLOY_VERSION
-ARG LMDEPLOY_URL
+ARG LMDEPLOY_VERSION=0.11.0
+ARG LMDEPLOY_URL=none
 
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     pip install fastapi fire openai outlines \
-        partial_json_parser ray[default] shortuuid uvicorn \
-        'pydantic>2' openai_harmony dlblas --no-cache-dir  && \
+    partial_json_parser ray[default] shortuuid uvicorn \
+    'pydantic>2' openai_harmony dlblas --no-cache-dir  && \
     if [ -n "${LMDEPLOY_VERSION}" ]; then \
-        pip install lmdeploy==${LMDEPLOY_VERSION} --no-deps --no-cache-dir; \
+    pip install lmdeploy==${LMDEPLOY_VERSION} --no-deps --no-cache-dir; \
     else \
-        git clone $(echo ${LMDEPLOY_URL} | cut -d '@' -f 1) && \
-        cd ${CODESPACE}/lmdeploy && \
-        git checkout $(echo ${LMDEPLOY_URL} | cut -d '@' -f 2) && \
-        pip install . -v --no-deps --no-cache-dir; \
+    git clone $(echo ${LMDEPLOY_URL} | cut -d '@' -f 1) && \
+    cd ${CODESPACE}/lmdeploy && \
+    git checkout $(echo ${LMDEPLOY_URL} | cut -d '@' -f 2) && \
+    pip install . -v --no-deps --no-cache-dir; \
     fi
 
 ## install xtuner
-ARG XTUNER_URL
-ARG XTUNER_COMMIT
+ARG XTUNER_URL=https://github.com/InternLM/xtuner@main
+ARG XTUNER_COMMIT=main
 #RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
 #   git clone $(echo ${XTUNER_URL} | cut -d '@' -f 1) && \
 #   cd ${CODESPACE}/xtuner && \
@@ -227,7 +227,7 @@ WORKDIR ${CODESPACE}
 # nccl update for torch 2.6.0
 RUN --mount=type=secret,id=HTTPS_PROXY,env=https_proxy \
     if [ "x${TORCH_VERSION}" = "x2.6.0" ]; then \
-        pip install nvidia-nccl-cu12==2.25.1 --no-cache-dir; \
+    pip install nvidia-nccl-cu12==2.25.1 --no-cache-dir; \
     fi
 
 # setup sysctl
